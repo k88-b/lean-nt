@@ -2,23 +2,58 @@ import Mathlib
 import NumberTheory.Notations
 import NumberTheory.Theorems
 
+-- Nat.digits возвращает список цифр числа n по основанию 10
+-- length дает длину списка
 def numDigits (n : ℕ) : ℕ :=
   (Nat.digits 10 n).length
 
+-- конкатенация определена как:
+--  добавляем к числу a такое же колво нулей, как и колво цифр в числе b + само число b
 def concatNum (a b : ℕ) : ℕ :=
   a * 10 ^ (numDigits b) + b
 
+-- функция определена рекурсивно
+-- рассмотрены 3 случая: для 0 или 1 она вернет 0 или 1 соответсвенно;
+-- для числа k мы представляем его как n+1 и возвращаем конкатенацию числа (piece n) и числа n+1
+-- пример: для piece 2 мы получим 2 = 1 + 1 => конкатенируем piece 1 и 2 => получаем 12
+--                                                                        так как piece 1 равен 1
 def piece : ℕ → ℕ
   | 0 => 0
   | 1 => 1
   | n + 1 => concatNum (piece n) (n + 1)
 
+-- предикат. Если функция возвращает число, то предикат {false; true}
 def IsPiece (x : ℕ) : Prop :=
   ∃ n > 1, piece n = x
 
+-- предикат. начинается ли число x с цифр "12"
+-- проверяем как
+-- существует ли k такое что 12 ⋆ 10ᵏ ≤ x < 13 ⋆ 10ᵏ
 def HasPrefix12 (x : ℕ) : Prop :=
   ∃ k : ℕ, 12 * (10^k) ≤ x ∧ x < 13 * (10^k)
 
+-- если a начинается с "12" то при конкатенации a с любым b мы получим число начинающееся с "12"
+
+-- важную роль в доказательстве этой леммы играет теорема Nat.lt_base_pow_length_digits
+-- она гласит что любое число n по основанию b меньше чем b в степени колва числа m
+-- m < b ^ (num of digits m)
+
+-- используем свидетеля k + num of digits b
+-- если умножим 12 * 10ᵏ ≤ a (нижняя граница) на 10 ^ (num of digits b)
+-- получим 12 * 10 ^ (k + num of digits b) ≤ a * 10 ^ (num of digits b)
+-- при цели доказательства для нижней границы
+--                   12 * 10 ^ (k + num of digits b) ≤ a * 10 ^ (num of digits b) + b
+-- что тривиально (a ≤ b => a ≤ b + c) (для ℕ)
+
+-- верхняя граница:
+-- a < 13 * 10ᵏ тоже саоме что и
+-- a + 1 ≤ 13 * 10ᵏ
+-- умножаем на 10 ^ (num of digits b)
+-- a * 10 ^ (num of digits b) + 10 ^ (num of digits b) < 13 * 10 ^ (k + num of digits b)
+-- при этом мы знаем что b < 10 ^ (num of digits b)
+-- и наша цель это
+--                a * 10 ^ (num of digits b) + b < 13 * 10 ^ (k + num of digits b)
+-- что тривиально по нашему условию b < ...
 lemma concat_maintains_prefix {a b : ℕ} (ha : HasPrefix12 a) : HasPrefix12 (concatNum a b) := by
   unfold HasPrefix12 at *
   unfold concatNum at *
@@ -47,6 +82,15 @@ lemma concat_maintains_prefix {a b : ℕ} (ha : HasPrefix12 a) : HasPrefix12 (co
     rw [add_mul, one_mul] at h_le
     omega
 
+-- кусок начинается с "12"
+
+-- используем индукцию по n
+-- база: n = 2
+-- доказываем что 12 начинается с 12
+-- шаг: n = d + 1
+-- перепишем piece d + 1 как concatNum (piece d) (d+1)
+-- по предположению индукции piece d начинается с 12
+-- используем предыдущюю лемму и закрываем доказательство
 lemma piece_has_prefix (n : ℕ) (hn : n > 1) : HasPrefix12 (piece n) := by
   unfold HasPrefix12
   have hn2 : 2 ≤ n := hn
@@ -72,12 +116,39 @@ lemma piece_has_prefix (n : ℕ) (hn : n > 1) : HasPrefix12 (piece n) := by
     rw [h_step]
     exact concat_maintains_prefix h
 
+-- Если x - кусок, тогда x начинается с 12
+-- обертка над прошлой леммой.
 lemma piece_invariant {x : ℕ} (h : IsPiece x) : HasPrefix12 x := by
   unfold IsPiece at h
   obtain ⟨k,hk⟩ := h
   rw [← hk.right]
   exact piece_has_prefix k hk.left
 
+-- Если мы умножим два числа, которые начинаются с "12"
+--                                     то полученное число не будет начинаться с "12"
+
+-- доказываем от противного: пусть a⋆b начинается с "12" c показателем степени t
+-- 12 * 10ᵗ ≤ a * b < 13 * 10ᵗ
+-- раскрываем интервалы для a и b с показателями степеней k1 и k1 соответственно
+-- 12 * 10 ^ k1 ≤ a < 13 * 10 ^ k1
+-- 12 * 10 ^ k2 ≤ b < 13 * 10 ^ k2
+-- пусть K = k1 + k2
+-- умножаем нижние границы
+-- 144 * 10 ^ K < a * b
+-- верхние
+-- a * b < 169 * 10 ^ K
+-- разбираем случаи:
+-- · t ≤ K + 1
+--  тогда 13 * 10 ^ t ≤ 130 * 10 ^ K
+--  и a * b > 144 * 10 ^ K
+--    a * b < 13 * 10 ^ t
+--  противоречие
+-- · K + 1 < t
+--  перпишем это как K + 2 ≤ t
+--  тогда 1200 * 10 ^ K ≤ 12 * 10 ^ t
+--  и 12 * 10 ^ t ≤ a * b
+--    169 * 10 ^ K > a * b
+--  противоречие
 lemma mul_not_prefix12 {a b : ℕ} (ha : HasPrefix12 a) (hb : HasPrefix12 b) :
   ¬(HasPrefix12 (a*b)) := by
   unfold HasPrefix12 at *
@@ -106,6 +177,13 @@ lemma mul_not_prefix12 {a b : ℕ} (ha : HasPrefix12 a) (hb : HasPrefix12 b) :
         _ ≤ 12 * 10 ^ t := by gcongr; decide
     omega
 
+-- соединяем вместе:
+-- a - кусок => начинается с 12
+-- b - кусок => начинается с 12
+-- предположим противное: a * b - кусок
+-- тогда a * b должно начинаться с 12
+-- но произведение двух кусков не может начинаться с 12 по раннее доказанной лемме
+-- противоречие
 theorem ex5 (a b : ℕ) (ha : IsPiece a) (hb : IsPiece b) : ¬(IsPiece (a * b)) := by
   have h1 := piece_invariant ha
   have h2 := piece_invariant hb
