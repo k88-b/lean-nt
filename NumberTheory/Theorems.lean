@@ -92,3 +92,7 @@ theorem mod_add_const (m a b c : ℤ) (h : a ≡ b (mod m)) : (a + c) ≡ (b+c) 
   have h1: a + c - (b + c) = a - b := by ring
   rw [h1]
   exact h
+
+theorem one_dvd' (a : ℤ) : 1 ∣ a := by
+  use a
+  ring
